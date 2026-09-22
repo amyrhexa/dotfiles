@@ -6,6 +6,16 @@ _log_success() { printf '\033[1;32m ✔ \033[0m %s\n' "$*" }
 _log_warn()    { printf '\033[1;33m ⚠ \033[0m %s\n' "$*" >&2 }
 _log_error()   { printf '\033[1;31m ✖ \033[0m %s\n' "$*" >&2 }
 
+
+# greeting
+greet() {
+    if [[ -t 1 ]] && (( $+commands[figlet] )); then
+        local banner
+        banner=$(figlet -f "DOS Rebel" " >HEXa!" 2>/dev/null | awk 'NF')
+        [[ -n "$banner" ]] && print -P "%F{#7aa2f7}${banner}%f"
+    fi
+}
+
 # ===================================================================
 # Directory Navigation
 # ===================================================================
