@@ -206,8 +206,6 @@ if [[ -x "$MAMBA_EXE" ]]; then
 fi
 # <<< mamba initialize <<<
 
-greet
-
 # -----------------------------
 # Self-Compilation (same stale-check idiom as the completion dump above)
 # -----------------------------

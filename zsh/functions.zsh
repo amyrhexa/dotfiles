@@ -6,14 +6,42 @@ _log_success() { printf '\033[1;32m ✔ \033[0m %s\n' "$*" }
 _log_warn()    { printf '\033[1;33m ⚠ \033[0m %s\n' "$*" >&2 }
 _log_error()   { printf '\033[1;31m ✖ \033[0m %s\n' "$*" >&2 }
 
+# ===================================================================
+# Yazi File Manager Wrapper (CWD sync on exit)
+# ===================================================================
+y() {
+    emulate -L zsh
+    local tmp cwd
 
-# greeting
-greet() {
-    if [[ -t 1 ]] && (( $+commands[figlet] )); then
-        local banner
-        banner=$(figlet -f "DOS Rebel" " >HEXa!" 2>/dev/null | awk 'NF')
-        [[ -n "$banner" ]] && print -P "%F{#7aa2f7}${banner}%f"
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")" || return 1
+    command yazi "$@" --cwd-file="$tmp"
+
+    if [[ -f "$tmp" ]]; then
+        cwd="$(<"$tmp")"
+        command rm -f -- "$tmp"
+        if [[ -n "$cwd" && "$cwd" != "$PWD" && -d "$cwd" ]]; then
+            builtin cd -- "$cwd" || return
+        fi
     fi
+}
+
+# ===================================================================
+# File Transfer Utilities
+# ===================================================================
+rsync-copy() {
+    emulate -L zsh
+
+    if (( $# < 2 )); then
+        _log_error "Usage: rsync-copy <source...> <destination>"
+        return 1
+    fi
+
+    if (( ! $+commands[rsync] )); then
+        _log_error "'rsync' is not installed or not in PATH"
+        return 1
+    fi
+
+    command rsync -aHh --info=progress2 --partial "$@"
 }
 
 # ===================================================================
@@ -27,7 +55,7 @@ mkcd() {
         return 1
     fi
 
-    mkdir -p -- "$1" && cd -- "$1"
+    command mkdir -p -- "$1" && builtin cd -- "$1"
 }
 
 # ===================================================================
@@ -74,10 +102,20 @@ vscode_env() {
     if [[ -d .git || -d .vscode ]]; then
         local vscode_dir=".vscode"
         local settings="$vscode_dir/settings.json"
-        mkdir -p "$vscode_dir"
+        command mkdir -p -- "$vscode_dir"
+
         if [[ ! -f "$settings" ]]; then
             printf '{\n  "python.defaultInterpreterPath": "%s"\n}\n' "$py_bin" > "$settings"
-            _log_info "Configured default interpreter in .vscode/settings.json"
+            _log_info "Created .vscode/settings.json with default interpreter"
+        elif (( $+commands[jq] )); then
+            # Non-destructively merge interpreter path into existing settings
+            local updated_json
+            if updated_json=$(jq --arg p "$py_bin" '. + {"python.defaultInterpreterPath": $p}' "$settings" 2>/dev/null); then
+                printf '%s\n' "$updated_json" > "$settings"
+                _log_info "Updated interpreter in existing .vscode/settings.json"
+            fi
+        else
+            _log_warn ".vscode/settings.json exists; install 'jq' to auto-update existing settings"
         fi
     fi
 }

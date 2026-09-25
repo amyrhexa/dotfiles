@@ -6,6 +6,7 @@ alias aliases='${EDITOR:-nvim} "${ZDOTDIR:-$HOME/.config/zsh}/aliases.zsh"'
 alias nv="nvim"
 alias grep='grep --color=auto'
 alias reload='exec zsh'
+alias sysup="sudo dnf upgrade --refresh && sudo dnf autoremove && flatpak update && flatpak uninstall --unused"
 
 # Modern CLI substitutions (guarded & portable)
 if (( $+commands[eza] )); then
