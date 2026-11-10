@@ -1,8 +1,18 @@
-# 0. Early Return for Non-Interactive Shells
+# ~/.config/zsh/.zshrc — Nord Dark
+# Colours below use ANSI names (blue, cyan, red...), so kitty's palette themes
+# the prompt and completion automatically. Only fzf needs explicit hex values.
+
+# 0. Early return for non-interactive shells
 [[ -o interactive ]] || return
 
+# Powerlevel10k instant prompt. Must stay near the top; nothing above this
+# may print output or read input.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 # -----------------------------
-# History Configuration
+# History & State Directories
 # -----------------------------
 HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
 HISTSIZE=50000
@@ -16,7 +26,8 @@ setopt HIST_SAVE_NO_DUPS
 setopt HIST_IGNORE_SPACE
 setopt HIST_REDUCE_BLANKS
 
-[[ -d "${HISTFILE:h}" ]] || mkdir -p -m 700 "${HISTFILE:h}"
+[[ -d "${HISTFILE:h}" ]] || command mkdir -p -m 700 "${HISTFILE:h}"
+[[ -n "$LESSHISTFILE" && ! -d "${LESSHISTFILE:h}" ]] && command mkdir -p -m 700 "${LESSHISTFILE:h}"
 
 # -----------------------------
 # Core Shell Options
@@ -44,6 +55,7 @@ key[Delete]="${terminfo[kdch1]}"
 [[ -n "${key[Home]}" ]]   && bindkey "${key[Home]}"   beginning-of-line
 [[ -n "${key[End]}" ]]    && bindkey "${key[End]}"    end-of-line
 [[ -n "${key[Delete]}" ]] && bindkey "${key[Delete]}" delete-char
+unset key
 
 # Universal fallbacks & word operations
 bindkey "^[[H"    beginning-of-line
@@ -58,55 +70,55 @@ bindkey "^[[1;5D" backward-word
 bindkey "^?"      backward-delete-char
 
 # -----------------------------
-# Prompt (Native Git-Aware)
-# -----------------------------
-autoload -Uz vcs_info add-zsh-hook
-add-zsh-hook precmd vcs_info
-
-zstyle ':vcs_info:*' enable git
-zstyle ':vcs_info:*' max-exports 1
-zstyle ':vcs_info:git:*' formats ' %F{yellow}(%b)%f'
-zstyle ':vcs_info:git:*' actionformats ' %F{yellow}(%b|%F{red}%a%F{yellow})%f'
-
-setopt PROMPT_SUBST
-# %? reflects the exit status of the last typed command even after precmd
-# hooks (like vcs_info's git calls) run — zsh caches it for prompt expansion,
-# so no manual capture is needed. Only shown when the last command failed.
-PROMPT='%F{blue}%~%f${vcs_info_msg_0_}
-%(?..%F{red}%?%f )› '
-# -----------------------------
 # Modular Aliases & Functions (Isolated from plugin failures)
 # -----------------------------
-[[ -f "$ZDOTDIR/aliases.zsh" ]] && source "$ZDOTDIR/aliases.zsh"
-[[ -f "$ZDOTDIR/functions.zsh" ]] && source "$ZDOTDIR/functions.zsh"
+[[ -r "$ZDOTDIR/aliases.zsh" ]] && source "$ZDOTDIR/aliases.zsh"
+[[ -r "$ZDOTDIR/functions.zsh" ]] && source "$ZDOTDIR/functions.zsh"
 
 # -----------------------------
 # Plugin Manager Bootstrap (Zinit)
 # -----------------------------
 typeset -g _zinit_ready=0
 ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
-if [[ ! -f "$ZINIT_HOME/zinit.zsh" ]]; then
-    if (( ! $+commands[git] )); then
+if [[ ! -r "$ZINIT_HOME/zinit.zsh" ]]; then
+    if [[ -e "$ZINIT_HOME" ]]; then
+        print -u2 "zsh: incomplete Zinit installation at $ZINIT_HOME"
+    elif (( ! $+commands[git] )); then
         print -u2 "zsh: git required for Zinit installation"
     else
-        mkdir -p "${ZINIT_HOME:h}"
-        if git clone --depth 1 https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"; then
-            source "$ZINIT_HOME/zinit.zsh"
-            _zinit_ready=1
-        else
+        command mkdir -p "${ZINIT_HOME:h}" &&
+            command git clone --depth 1 https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME" ||
             print -u2 "zsh: failed to clone Zinit repository"
-        fi
     fi
-else
+fi
+
+# Source outside `if` condition so ERR_RETURN inside plugins is not suppressed
+if [[ -r "$ZINIT_HOME/zinit.zsh" ]]; then
     source "$ZINIT_HOME/zinit.zsh"
-    _zinit_ready=1
+    (( $? == 0 && $+functions[zinit] )) && _zinit_ready=1
+fi
+
+# -----------------------------
+# Prompt (Powerlevel10k with native fallback)
+# -----------------------------
+if (( _zinit_ready )); then
+    zinit ice depth"1"
+    zinit light romkatv/powerlevel10k
+fi
+
+if (( $+functions[p10k] )); then
+    typeset -g POWERLEVEL9K_CONFIG_FILE="$ZDOTDIR/p10k.zsh"
+    [[ -r "$POWERLEVEL9K_CONFIG_FILE" ]] && source "$POWERLEVEL9K_CONFIG_FILE"
+else
+    PROMPT='%F{cyan}%~%f %F{blue}›%f '   # fallback if Zinit/p10k is unavailable
 fi
 
 # Pre-compinit completions (blockf avoids O(N) scans; src directory injected manually)
+typeset -U fpath
 if (( _zinit_ready )); then
     zinit ice depth"1" blockf
     zinit light zsh-users/zsh-completions
-    [[ -d "${ZINIT_HOME:h}/plugins/zsh-users---zsh-completions/src" ]] && \
+    [[ -d "${ZINIT_HOME:h}/plugins/zsh-users---zsh-completions/src" ]] &&
         fpath=("${ZINIT_HOME:h}/plugins/zsh-users---zsh-completions/src" $fpath)
 fi
 
@@ -115,25 +127,49 @@ fi
 # -----------------------------
 autoload -Uz compinit
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
-[[ -d "$CACHE_DIR" ]] || mkdir -p -m 700 "$CACHE_DIR"
+[[ -d "$CACHE_DIR" ]] || command mkdir -p -m 700 "$CACHE_DIR"
 
 DUMP_FILE="$CACHE_DIR/.zcompdump-${ZSH_VERSION}"
-typeset -a dump_check=("$DUMP_FILE"(#qN.mh+24))
-
-if [[ ! -f "$DUMP_FILE" ]] || (( $#dump_check )); then
-    compinit -d "$DUMP_FILE"
-    zcompile -U "$DUMP_FILE"
-else
-    compinit -C -d "$DUMP_FILE"
-    [[ -f "${DUMP_FILE}.zwc" ]] || zcompile -U "$DUMP_FILE"
+# Run full compinit (including compaudit security checks and fpath file-count
+# validation) on every startup instead of bypassing security with compinit -C.
+compinit -d "$DUMP_FILE"
+if [[ -s "$DUMP_FILE" && ( ! -s "${DUMP_FILE}.zwc" || "$DUMP_FILE" -nt "${DUMP_FILE}.zwc" ) ]]; then
+    if zcompile -U "${DUMP_FILE}.tmp.$$.zwc" "$DUMP_FILE"; then
+        command mv -f -- "${DUMP_FILE}.tmp.$$.zwc" "${DUMP_FILE}.zwc"
+    else
+        command rm -f -- "${DUMP_FILE}.tmp.$$.zwc" "${DUMP_FILE}.zwc"
+    fi
 fi
-unset dump_check
+
+# -----------------------------
+# LS_COLORS (cached, atomic under NO_CLOBBER)
+# -----------------------------
+# NO_GLOBAL_RCS in .zshenv skips the distro's /etc/profile.d/colorls.sh, so
+# LS_COLORS would be empty (no colours in `ls` completion lists). Rebuild it once
+# and cache it via a PID-unique temporary file.
+if [[ -z "$LS_COLORS" ]] && (( $+commands[dircolors] )); then
+    LSC_CACHE="$CACHE_DIR/dircolors.zsh"
+    if [[ -s "$LSC_CACHE" && ! "$commands[dircolors]" -nt "$LSC_CACHE" ]]; then
+        source "$LSC_CACHE"
+    fi
+    if [[ ! -s "$LSC_CACHE" || "$commands[dircolors]" -nt "$LSC_CACHE" || -z "$LS_COLORS" ]]; then
+        LSC_TMP="${LSC_CACHE}.tmp.$$"
+        if dircolors -b >| "$LSC_TMP" 2>/dev/null && [[ -s "$LSC_TMP" ]]; then
+            command mv -f -- "$LSC_TMP" "$LSC_CACHE"
+        else
+            command rm -f -- "$LSC_TMP"
+        fi
+        [[ -s "$LSC_CACHE" ]] && source "$LSC_CACHE"
+    fi
+fi
 
 # -----------------------------
 # Completion Styling
 # -----------------------------
 zmodload -i zsh/complist
 
+# Default to native menu selection; overridden to `menu no` below only after
+# fzf-tab is confirmed loaded.
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*'
 zstyle ':completion:*' group-name ''
@@ -146,42 +182,61 @@ zstyle ':completion:*' squeeze-slashes true
 # CLI Integrations (Cached Output; must precede fzf-tab)
 # -----------------------------
 if (( $+commands[fzf] )); then
+    # Nord Dark for fzf and fzf-tab (fzf-tab reads FZF_DEFAULT_OPTS too).
+    export FZF_DEFAULT_OPTS="--height=40% --layout=reverse --border=rounded \
+--color=bg:-1,bg+:#353d4b,fg:#aeb8c8,fg+:#eceff4,hl:#88c0d0,hl+:#9bd0df \
+--color=info:#8b97b0,prompt:#88c0d0,pointer:#88c0d0,marker:#a3be8c,spinner:#81a1c1 \
+--color=header:#8b97b0,border:#444d5e,gutter:-1"
+
     FZF_CACHE="$CACHE_DIR/fzf_init.zsh"
-    FZF_TMP="${FZF_CACHE}.tmp"
-    if [[ ! -s "$FZF_CACHE" || "$commands[fzf]" -nt "$FZF_CACHE" ]]; then
-        if fzf --zsh > "$FZF_TMP" 2>/dev/null; then
-            mv "$FZF_TMP" "$FZF_CACHE"
-        else
-            rm -f "$FZF_TMP"
-            print '# disabled' > "$FZF_CACHE"
-        fi
+    if [[ -s "$FZF_CACHE" && ! "$commands[fzf]" -nt "$FZF_CACHE" ]]; then
+        source "$FZF_CACHE"
     fi
-    [[ -s "$FZF_CACHE" ]] && source "$FZF_CACHE"
+    if [[ ! -s "$FZF_CACHE" || "$commands[fzf]" -nt "$FZF_CACHE" ]] || (( ! $+functions[fzf-file-widget] )); then
+        FZF_TMP="${FZF_CACHE}.tmp.$$"
+        if fzf --zsh >| "$FZF_TMP" 2>/dev/null && [[ -s "$FZF_TMP" ]]; then
+            command mv -f -- "$FZF_TMP" "$FZF_CACHE"
+        else
+            command rm -f -- "$FZF_TMP"
+        fi
+        [[ -s "$FZF_CACHE" ]] && source "$FZF_CACHE"
+    fi
 fi
 
 if (( $+commands[zoxide] )); then
     ZOXIDE_CACHE="$CACHE_DIR/zoxide_init.zsh"
-    ZOXIDE_TMP="${ZOXIDE_CACHE}.tmp"
-    if [[ ! -s "$ZOXIDE_CACHE" || "$commands[zoxide]" -nt "$ZOXIDE_CACHE" ]]; then
-        if zoxide init zsh > "$ZOXIDE_TMP" 2>/dev/null; then
-            mv "$ZOXIDE_TMP" "$ZOXIDE_CACHE"
-        else
-            rm -f "$ZOXIDE_TMP"
-            print '# disabled' > "$ZOXIDE_CACHE"
-        fi
+    if [[ -s "$ZOXIDE_CACHE" && ! "$commands[zoxide]" -nt "$ZOXIDE_CACHE" ]]; then
+        source "$ZOXIDE_CACHE"
     fi
-    [[ -s "$ZOXIDE_CACHE" ]] && source "$ZOXIDE_CACHE"
+    if [[ ! -s "$ZOXIDE_CACHE" || "$commands[zoxide]" -nt "$ZOXIDE_CACHE" ]] || (( ! $+functions[__zoxide_z] )); then
+        ZOXIDE_TMP="${ZOXIDE_CACHE}.tmp.$$"
+        if zoxide init zsh >| "$ZOXIDE_TMP" 2>/dev/null && [[ -s "$ZOXIDE_TMP" ]]; then
+            command mv -f -- "$ZOXIDE_TMP" "$ZOXIDE_CACHE"
+        else
+            command rm -f -- "$ZOXIDE_TMP"
+        fi
+        [[ -s "$ZOXIDE_CACHE" ]] && source "$ZOXIDE_CACHE"
+    fi
 fi
 
 # -----------------------------
 # Tab Completion & Deferred Plugins
 # -----------------------------
+typeset -g _use_fzf_tab=0
 if (( _zinit_ready )); then
-    # Synchronously load fzf-tab after compinit and fzf --zsh to guarantee Tab ownership
-    zinit ice depth"1"
-    zinit light Aloxaf/fzf-tab
+    # Synchronously load fzf-tab after compinit and fzf --zsh to guarantee Tab ownership.
+    # Disable native completion menu only if fzf-tab actually loaded.
+    if (( $+commands[fzf] )); then
+        zinit ice depth"1"
+        zinit light Aloxaf/fzf-tab
+        if (( $+functions[fzf-tab-complete] )); then
+            _use_fzf_tab=1
+            zstyle ':completion:*' menu no
+        fi
+    fi
 
-    # fast-syntax-highlighting strictly loaded last
+    # Autosuggestions use ANSI "bright black" (color8 = #8490a8 in kitty) by default.
+    # fast-syntax-highlighting strictly loaded last.
     zinit wait"0" lucid depth"1" for \
         atload"_zsh_autosuggest_start" \
         zsh-users/zsh-autosuggestions \
@@ -193,23 +248,38 @@ export MAMBA_EXE="${HOME}/.local/bin/micromamba"
 export MAMBA_ROOT_PREFIX="${HOME}/.micromamba"
 
 if [[ -x "$MAMBA_EXE" ]]; then
+    # Unalias micromamba before sourcing so a fallback alias cannot expand inside
+    # the hook's `micromamba() { ... }` definition. Only fall back to the alias
+    # when the hook fails to define the `micromamba` function.
+    unalias micromamba 2>/dev/null
     MAMBA_CACHE="$CACHE_DIR/micromamba_init.zsh"
-    MAMBA_TMP="${MAMBA_CACHE}.tmp"
-    if [[ ! -s "$MAMBA_CACHE" || "$MAMBA_EXE" -nt "$MAMBA_CACHE" ]]; then
-        if "$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" > "$MAMBA_TMP" 2>/dev/null; then
-            mv "$MAMBA_TMP" "$MAMBA_CACHE"
-        else
-            rm -f "$MAMBA_TMP"
-        fi
+    if [[ -s "$MAMBA_CACHE" && ! "$MAMBA_EXE" -nt "$MAMBA_CACHE" ]]; then
+        source "$MAMBA_CACHE"
     fi
-    [[ -s "$MAMBA_CACHE" ]] && source "$MAMBA_CACHE" || alias micromamba="$MAMBA_EXE"
+    if [[ ! -s "$MAMBA_CACHE" || "$MAMBA_EXE" -nt "$MAMBA_CACHE" ]] || (( ! $+functions[micromamba] )); then
+        MAMBA_TMP="${MAMBA_CACHE}.tmp.$$"
+        if "$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" >| "$MAMBA_TMP" 2>/dev/null && [[ -s "$MAMBA_TMP" ]]; then
+            command mv -f -- "$MAMBA_TMP" "$MAMBA_CACHE"
+        else
+            command rm -f -- "$MAMBA_TMP"
+        fi
+        [[ -s "$MAMBA_CACHE" ]] && source "$MAMBA_CACHE"
+    fi
+    (( $+functions[micromamba] )) || alias micromamba="$MAMBA_EXE"
 fi
 # <<< mamba initialize <<<
 
 # -----------------------------
-# Self-Compilation (same stale-check idiom as the completion dump above)
+# Self-Compilation (atomic .zwc generation; removes stale .zwc on syntax error)
 # -----------------------------
-for _rc_file in "$ZDOTDIR"/.zshenv "$ZDOTDIR"/.zshrc "$ZDOTDIR"/aliases.zsh "$ZDOTDIR"/functions.zsh; do
-    [[ -s "$_rc_file" && ( ! -s "${_rc_file}.zwc" || "$_rc_file" -nt "${_rc_file}.zwc" ) ]] && zcompile -U "$_rc_file"
+# (~/.zshenv is intentionally not listed: it lives in $HOME, not in $ZDOTDIR.)
+for _rc_file in "$ZDOTDIR"/{.zshrc,aliases.zsh,functions.zsh,p10k.zsh}(N); do
+    if [[ ! -s "${_rc_file}.zwc" || "$_rc_file" -nt "${_rc_file}.zwc" ]]; then
+        if zcompile -U "${_rc_file}.tmp.$$.zwc" "$_rc_file"; then
+            command mv -f -- "${_rc_file}.tmp.$$.zwc" "${_rc_file}.zwc"
+        else
+            command rm -f -- "${_rc_file}.tmp.$$.zwc" "${_rc_file}.zwc"
+        fi
+    fi
 done
-unset _rc_file
+unset _rc_file CACHE_DIR DUMP_FILE LSC_CACHE LSC_TMP FZF_CACHE FZF_TMP ZOXIDE_CACHE ZOXIDE_TMP MAMBA_CACHE MAMBA_TMP
