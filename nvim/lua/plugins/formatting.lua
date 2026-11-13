@@ -16,14 +16,20 @@ return {
       json = { "prettier" },
       jsonc = { "prettier" },
       yaml = { "prettier" },
-      markdown = { "prettier" }, -- prettier + the markdown parser were already installed, just unwired
+      markdown = { "prettier" },
       sh = { "shfmt" },
       bash = { "shfmt" },
       lua = { "stylua" },
     },
-    format_on_save = {
-      timeout_ms = 1000,
-      lsp_format = "fallback",
-    },
+    format_on_save = function(bufnr)
+      -- Guard against formatting large research files or background autosaves
+      if vim.b[bufnr].large_file then
+        return nil
+      end
+      return {
+        timeout_ms = 1000,
+        lsp_format = "fallback",
+      }
+    end,
   },
 }

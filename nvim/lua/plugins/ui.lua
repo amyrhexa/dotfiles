@@ -1,5 +1,7 @@
+local nord = require("theme.nord")
+
 return {
-  -- File Icons
+  -- Nerd Font icons
   { "nvim-tree/nvim-web-devicons", lazy = true },
 
   -- Statusline (Lualine)
@@ -8,21 +10,31 @@ return {
     event = "VeryLazy",
     opts = {
       options = {
-        theme = "everforest",
+        theme = nord.lualine_theme,
         component_separators = { left = "", right = "" },
         section_separators = { left = "", right = "" },
         globalstatus = true,
       },
       sections = {
         lualine_a = { "mode" },
-        -- Same glyphs as the diagnostic signs in plugins/diagnostics.lua, so
-        -- the statusline count and the gutter icon always agree.
         lualine_b = {
-          "branch",
-          "diff",
+          { "branch", icon = "\u{e725}" },
+          {
+            "diff",
+            symbols = {
+              added = "\u{f457} ",
+              modified = "\u{f459} ",
+              removed = "\u{f458} ",
+            },
+          },
           {
             "diagnostics",
-            symbols = { error = " ", warn = " ", info = " ", hint = " " },
+            symbols = {
+              error = "\u{ea87} ",
+              warn = "\u{ea6c} ",
+              info = "\u{ea74} ",
+              hint = "\u{eb58} ",
+            },
           },
         },
         lualine_c = { { "filename", path = 1 } },
@@ -33,38 +45,105 @@ return {
     },
   },
 
-  -- Open Buffer Tabs Bar (Bufferline)
+  -- Inline diagnostic viewer (replaces ErrorLens)
   {
-    "akinsho/bufferline.nvim",
-    version = "*",
-    event = "VeryLazy",
-    dependencies = { "nvim-tree/nvim-web-devicons" },
+    "rachartier/tiny-inline-diagnostic.nvim",
+    event = "LspAttach",
+    priority = 1000,
     opts = {
+      preset = "modern",
       options = {
-        mode = "buffers",
-        diagnostics = "nvim_lsp",
-        always_show_bufferline = true,
-        offsets = {
-          {
-            filetype = "NvimTree",
-            text = "File Explorer",
-            text_align = "center",
-            separator = true,
+        show_source = {
+          enabled = true,
+        },
+        use_icons_from_diagnostic = true,
+        add_messages = true,
+        throttle = 20,
+        soft_wrap = true,
+      },
+    },
+  },
+
+  -- File Explorer
+  {
+    "nvim-tree/nvim-tree.lua",
+    cmd = { "NvimTreeToggle", "NvimTreeFocus" },
+    opts = {
+      disable_netrw = true,
+      hijack_netrw = true,
+      sync_root_with_cwd = true,
+      respect_buf_cwd = true,
+      view = {
+        width = 32,
+        side = "left",
+      },
+      renderer = {
+        highlight_git = true,
+        icons = {
+          show = {
+            file = true,
+            folder = true,
+            folder_arrow = true,
+            git = true,
           },
+        },
+      },
+      filters = {
+        dotfiles = false,
+        custom = {
+          "^\\.git$",
+          "^__pycache__$",
+          "^\\.pytest_cache$",
+          "^\\.mypy_cache$",
+          "^\\.ruff_cache$",
+          "^\\.venv$",
+          "^node_modules$",
+          "^\\.ipynb_checkpoints$",
+        },
+      },
+      actions = {
+        open_file = {
+          quit_on_open = false,
         },
       },
     },
   },
 
-  -- Keybinding Helper Overlay (Which-Key)
+  -- Persistent Integrated Terminal
+  {
+    "akinsho/toggleterm.nvim",
+    version = "*",
+    cmd = { "ToggleTerm", "TermExec" },
+    keys = {
+      { "<C-\\>", "<cmd>ToggleTerm<CR>", desc = "Toggle Terminal" },
+      { "<leader>tf", "<cmd>ToggleTerm direction=float<CR>", desc = "Float Terminal" },
+      { "<leader>th", "<cmd>ToggleTerm direction=horizontal<CR>", desc = "Horizontal Terminal" },
+      { "<leader>tv", "<cmd>ToggleTerm direction=vertical<CR>", desc = "Vertical Terminal" },
+    },
+    opts = {
+      size = 15,
+      open_mapping = [[<C-\>]],
+      hide_numbers = true,
+      shade_terminals = false,
+      start_in_insert = true,
+      insert_mappings = true,
+      terminal_mappings = false, -- Prevent overriding normal mode terminal escapes
+      persist_size = true,
+      persist_mode = true,
+      direction = "float",
+      float_opts = {
+        border = "rounded",
+        winblend = 0,
+      },
+    },
+  },
+
+  -- Keymap discovery helper
   {
     "folke/which-key.nvim",
     event = "VeryLazy",
     opts = {
       preset = "modern",
-      -- Names the leader groups that the keymaps in config/keymaps.lua and
-      -- plugins/git.lua already create, so the popup shows "Find"/"Git"/etc.
-      -- instead of a bare "+prefix".
       spec = {
         { "<leader>b", group = "Buffer" },
         { "<leader>d", group = "Diagnostics" },

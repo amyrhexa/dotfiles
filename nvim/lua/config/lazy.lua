@@ -15,20 +15,14 @@ if not (vim.uv or vim.loop).fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
--- Configure lazy.nvim and load plugin specifications
+-- Configure lazy.nvim
 require("lazy").setup("plugins", {
   defaults = { lazy = false },
   rocks = { enabled = false },
-  install = { colorscheme = { "everforest" } },
-  ui = { border = "rounded" }, -- matches Mason's rounded border for visual consistency
-  checker = {
-    enabled = false,
-    notify = false,
-  },
-  change_detection = {
-    enabled = true,
-    notify = false, -- Suppresses "Config reloaded" notification toast
-  },
+  install = { colorscheme = { "nord-dark" } },
+  ui = { border = "rounded" },
+  checker = { enabled = false, notify = false },
+  change_detection = { enabled = true, notify = false },
   performance = {
     rtp = {
       disabled_plugins = {

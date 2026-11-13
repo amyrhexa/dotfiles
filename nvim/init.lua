@@ -1,12 +1,17 @@
--- Byte-compile and cache Lua modules for faster subsequent startups
+-- Byte-compile and cache Lua modules for fast startup
 vim.loader.enable()
 
--- Set leader keys prior to loading any keymaps or plugins
+-- Disable netrw early to prevent directory-open race conditions before nvim-tree loads
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
+
+-- Leader keys must be set before any plugin or keymap loads
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
--- Core system configurations
+-- Core configuration
 require("config.options")
+require("config.diagnostics")
 require("config.keymaps")
 require("config.autocmds")
 

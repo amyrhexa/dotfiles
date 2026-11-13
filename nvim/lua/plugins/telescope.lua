@@ -10,10 +10,10 @@ return {
 
     telescope.setup({
       defaults = {
-        prompt_prefix = "  ",
-        selection_caret = " ",
+        prompt_prefix = "\u{f002} ",   -- 
+        selection_caret = "\u{f054} ", -- 
+        entry_prefix = "  ",
         path_display = { "smart" },
-        -- Ignore patterns matching VS Code files.exclude & watcherExclude
         file_ignore_patterns = {
           "%.git/",
           "node_modules/",
